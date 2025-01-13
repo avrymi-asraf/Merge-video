@@ -35,7 +35,7 @@ def video_to_array(video_path):
     return frames
 
 
-def create_synthetic_frame(
+def random_image(
     size: tuple = (100, 100),
     color: bool = False,
     num_shapes: int = 50,
@@ -159,3 +159,63 @@ def array_to_video(frames, output_path, fps=30, codec='mp4v'):
     finally:
         # Release resources
         out.release()
+
+
+
+
+def generate_complex_movement_matrices(num_frames, movement_intensity=1.0, sudden_movement_prob=0.1, noise_level=0.02):
+    """
+    Generate complex movement transformation matrices with controllable parameters.
+
+    Args:
+        num_frames (int): Number of frames to generate matrices for
+        movement_intensity (float): Overall scaling factor for movement amplitude (default: 1.0)
+        sudden_movement_prob (float): Probability of sudden movements [0-1] (default: 0.1)
+        noise_level (float): Standard deviation of continuous noise (default: 0.02)
+
+    Returns:
+        list: List of 3x3 transformation matrices (np.ndarray) for each frame
+    """
+    transformation_matrices = []
+    base_frequencies = np.array([0.2, 0.5, 0.8, 1.2, 1.5])
+    base_amplitudes = np.array([0.15, 0.08, 0.05, 0.03, 0.02]) * movement_intensity
+    phase_shifts = np.random.uniform(0, 2 * np.pi, len(base_frequencies))
+
+    for i in range(num_frames):
+        # Create complex rotation with multiple frequencies
+        angle = np.sum([
+            amp * np.sin(freq * i + phase)
+            for amp, freq, phase in zip(base_amplitudes, base_frequencies, phase_shifts)
+        ])
+
+        # Add sudden movements occasionally
+        if np.random.random() < sudden_movement_prob:
+            angle += np.random.normal(0, 0.2 * movement_intensity)
+            translation_sudden = np.random.normal(0, 8.0 * movement_intensity, 2)
+        else:
+            translation_sudden = np.zeros(2)
+
+        # Create complex translations
+        translation_x = movement_intensity * np.sum([
+            3 * np.sin(0.3 * i + np.pi / 4),
+            1 * np.cos(0.5 * i + np.pi / 3),
+        ]) + translation_sudden[0]
+
+        translation_y = movement_intensity * np.sum([
+            3 * np.cos(0.4 * i + np.pi / 5),
+            2 * np.sin(0.6 * i + np.pi / 2),
+        ]) + translation_sudden[1]
+
+        # Add continuous random noise
+        angle += np.random.normal(0, noise_level)
+        translation_x += np.random.normal(0, noise_level * 10)
+        translation_y += np.random.normal(0, noise_level * 10)
+
+        transformation_matrix = np.array([
+            [np.cos(angle), -np.sin(angle), translation_x],
+            [np.sin(angle), np.cos(angle), translation_y],
+            [0, 0, 1],
+        ])
+        transformation_matrices.append(transformation_matrix)
+
+    return transformation_matrices

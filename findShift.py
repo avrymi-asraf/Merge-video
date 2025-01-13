@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def keypoints(image):
     """
     Detect keypoints in an image using SIFT algorithm.
@@ -28,10 +29,11 @@ def keypoints(image):
 
     # Initialize SIFT detector
     sift = cv2.SIFT_create()
-    
+
     # Detect keypoints and compute descriptors
-    keypoints, descriptors = sift.detectAndCompute(gray.astype('uint8'), None)
+    keypoints, descriptors = sift.detectAndCompute(gray.astype("uint8"), None)
     return keypoints, descriptors
+
 
 def match(desc1, desc2, kp1, kp2, ratio_thresh=0.75):
     """
@@ -70,6 +72,7 @@ def match(desc1, desc2, kp1, kp2, ratio_thresh=0.75):
 
     return good_matches
 
+
 def compute_homography(kp1, kp2, matches):
     """
     Compute the homography matrix between two images using matched keypoints.
@@ -87,7 +90,9 @@ def compute_homography(kp1, kp2, matches):
         ValueError: If there are not enough matches to compute homography
     """
     if len(matches) < 4:
-        raise ValueError("Not enough matches to compute homography (minimum 4 required)")
+        raise ValueError(
+            "Not enough matches to compute homography (minimum 4 required)"
+        )
 
     # Extract location of good matches
     src_pts = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
@@ -95,10 +100,11 @@ def compute_homography(kp1, kp2, matches):
 
     # Find homography matrix using RANSAC
     H, mask = cv2.estimateAffinePartial2D(src_pts, dst_pts, cv2.RANSAC)
-    
+
     return H, mask
 
-def find_shift(img1, img2, ratio_thresh=0.75, min_matches=10):
+
+def find_shift(img1, img2, ratio_thresh=0.75, min_matches=10, skip_no_matches=False):
     """
     Find the transformation between two images using homography.
 
@@ -125,19 +131,31 @@ def find_shift(img1, img2, ratio_thresh=0.75, min_matches=10):
     kp2, desc2 = keypoints(img2)
 
     # Match keypoints
-    good_matches = match(desc1, desc2, kp1, kp2, ratio_thresh=ratio_thresh)
+    if (len(kp1) < min_matches or len(kp2) < min_matches) and not skip_no_matches:
+        raise ValueError("No keypoints detected in one or both images")
+    elif (len(kp1) < min_matches or len(kp2) < min_matches) and skip_no_matches:
+        return {
+            "homography": np.eye(3)[:2],
+            "inliers_mask": np.zeros(0, dtype=bool),
+            "num_matches": 0,
+        }
 
-    if len(good_matches) < min_matches:
-        raise ValueError(f"Not enough good matches found (minimum {min_matches} required, got {len(good_matches)})")
+    good_matches = match(desc1, desc2, kp1, kp2, ratio_thresh=ratio_thresh)
+    if len(good_matches) < min_matches and not skip_no_matches:
+        raise ValueError(
+            f"Not enough good matches found (minimum {min_matches} required, got {len(good_matches)})"
+        )
+    elif len(good_matches) < min_matches and skip_no_matches:
+        return {
+            "homography": np.eye(3)[:2],
+            "inliers_mask": np.zeros(len(good_matches), dtype=bool),
+            "num_matches": len(good_matches),
+        }
 
     # Compute homography
     H, mask = compute_homography(kp1, kp2, good_matches)
+    return {"homography": H, "inliers_mask": mask, "num_matches": len(good_matches)}
 
-    return {
-        'homography': H,
-        'inliers_mask': mask,
-        'num_matches': len(good_matches)
-    }
 
 def visualize_matches(img1, img2, title="Image Matching Visualization"):
     """
@@ -169,10 +187,13 @@ def visualize_matches(img1, img2, title="Image Matching Visualization"):
 
     # Create match visualization
     matches_img = cv2.drawMatches(
-        img1, kp1,
-        img2, kp2,
-        good_matches, None,
-        flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+        img1,
+        kp1,
+        img2,
+        kp2,
+        good_matches,
+        None,
+        flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS,
     )
 
     # Warp image1 to align with image2
@@ -184,22 +205,22 @@ def visualize_matches(img1, img2, title="Image Matching Visualization"):
     plt.subplot(141)
     plt.title(f"Image 1 Keypoints ({len(kp1)})")
     plt.imshow(cv2.drawKeypoints(img1, kp1, None, color=(0, 255, 0)))
-    plt.axis('off')
+    plt.axis("off")
 
     plt.subplot(142)
     plt.title(f"Image 2 Keypoints ({len(kp2)})")
     plt.imshow(cv2.drawKeypoints(img2, kp2, None, color=(0, 255, 0)))
-    plt.axis('off')
+    plt.axis("off")
 
     plt.subplot(143)
     plt.title(f"Matches ({len(good_matches)})")
     plt.imshow(matches_img)
-    plt.axis('off')
+    plt.axis("off")
 
     plt.subplot(144)
     plt.title("Transformed Image 1")
     plt.imshow(warped_img)
-    plt.axis('off')
+    plt.axis("off")
 
     plt.suptitle(title)
     plt.tight_layout()
