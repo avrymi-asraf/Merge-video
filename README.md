@@ -1,36 +1,27 @@
-# Merge-video
+# Exercise 4: Stereo Mosaicing
 
-## Poereps of the project
-Align consecutive frames 
-a. Lucas Kanade or Point Correspondences, you choose 
-b. Create a transformation matrix for every two consecutive frames 
-c. Debug: Use synthetic videos: no motion, simple translation, rotation...    
+## Goal
 
-Stabilize Rotations & Y translations 
-a. Debug: Use synthetic videos: no motion, simple translation, rotation... 
-b. Create - warp frames to get a stable video (only horizontal motion)    
+Implement the "Stereo Mosaicing" algorithm to create a video of n different panoramas from an input video scanning a scene horizontally. [cite: 57]
 
-Use motion composition to align all frames to same coordinates.
-a. Compute canvas size from motion matrices
-b. Create - paste aligned frames into canvas on top of each other
+### Steps
+* Compute rigid transformations between consecutive frames. 
+* Stabilize rotations and y translations.
+* Align all frames to the same coordinate system using motion composition.
+* Create a mosaic by pasting strips of the correct width and location.
+* Set a convergence point for the panoramas.
+* Record and process your own videos to test the algorithm. 
 
-Create mosaic by pasting strips using correct width & location
-a. Start with synthetic videos at constant translation & no rotation...
-b. Back Warping from canvas to frame...
+## Files and Functions
 
-Set convergence point (With no setting - this is infinity)
-a. Depth point that does not move between mosaics
+### tools.py
+*   [X] `video_to_array`: Convert a video into an array of frames.
+*   [X] `artificial_movement`: Apply artificial movement to a frame or an array of frames according to a given set of transformation matrices.
+*   [X] `create_synthetic_frame`: Create a synthetic frame with a given size, color, number of shapes, and shape size range.
 
-
-
-## filse
-### Tools.py
-contains the tools used in the project
-- [ ] functoin extract video to array of numpy arrays  `video_to_array`
-- [ ] functoin thet revice image and make move according the set of tranformatoin matrixs `artificial_movementmes`
-
-
-### Lucas_Kanade.py
-contains the implementation of the Lucas Kanade algorithm
- - [ ] function `lucas_kanade` that takes two frames and returns the transformation matrix
-
+### findShift.py
+*   [X] `keypoints`: Detect keypoints in an image using sift algorithm.
+*   [X] `match`: matche for the points using RANSAC algorithem.
+*   [X] `compute_homography`: Compute the homography matrix between two images.
+*   [X] `find_shift`: Find the shift between two images.
+*   [X] `visualize_matches`: visualize matches between two images.
