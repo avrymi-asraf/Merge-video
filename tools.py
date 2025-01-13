@@ -121,3 +121,41 @@ def artificial_movement(image, transformation_matrices, clip_frames=False):
             return [frame[y1 : y2 + 1, x1 : x2 + 1].copy() for frame in results]
 
     return results
+
+
+def array_to_video(frames, output_path, fps=30, codec='mp4v'):
+    """
+    Convert an array of frames to a video file.
+
+    Args:
+        frames (list or np.ndarray): List of frames, where each frame is a numpy array
+                                   Each frame should have shape (height, width, channels)
+        output_path (str): Path where the video file will be saved
+        fps (int): Frames per second for the output video
+        codec (str): Four character code for the video codec (e.g., 'mp4v', 'XVID')
+
+    Raises:
+        ValueError: If frames list is empty or frames have inconsistent dimensions
+    """
+    if not frames or len(frames) == 0:
+        raise ValueError("Error: Empty frames list")
+
+    # Get dimensions from first frame
+    height, width = frames[0].shape[:2]
+    
+    # Create video writer object
+    fourcc = cv2.VideoWriter_fourcc(*codec)
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    
+    if not out.isOpened():
+        raise ValueError("Error: Could not create video file")
+
+    try:
+        # Write frames to video
+        for frame in frames:
+            if frame.shape[:2] != (height, width):
+                raise ValueError("Error: Inconsistent frame dimensions")
+            out.write(frame.astype(np.uint8))
+    finally:
+        # Release resources
+        out.release()

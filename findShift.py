@@ -94,27 +94,22 @@ def compute_homography(kp1, kp2, matches):
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
 
     # Find homography matrix using RANSAC
-    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
+    H, mask = cv2.estimateAffinePartial2D(src_pts, dst_pts, cv2.RANSAC)
     
     return H, mask
 
-def find_shift(img1, img2, ratio_thresh=0.75, ransac_thresh=5.0, min_matches=10):
+def find_shift(img1, img2, ratio_thresh=0.75, min_matches=10):
     """
-    Find the complete transformation (translation and rotation) between two images.
+    Find the transformation between two images using homography.
 
     Args:
         img1 (np.ndarray): First image array of shape (H, W) or (H, W, C)
         img2 (np.ndarray): Second image array of shape (H, W) or (H, W, C)
         ratio_thresh (float): Ratio test threshold for Lowe's ratio test (default: 0.75)
-        ransac_thresh (float): Maximum allowed reprojection error in RANSAC (default: 5.0)
         min_matches (int): Minimum number of good matches required (default: 10)
 
     Returns:
         dict: Transformation parameters containing:
-            - 'translation' (tuple): (dx, dy) shift in pixels
-            - 'rotation' (float): rotation angle in degrees
-            - 'scale' (float): scale factor
-            - 'confidence' (float): transformation confidence score (0-1)
             - 'homography' (np.ndarray): 3x3 homography matrix
             - 'inliers_mask' (np.ndarray): Boolean mask of inlier matches
             - 'num_matches' (int): Number of good matches found
@@ -129,46 +124,16 @@ def find_shift(img1, img2, ratio_thresh=0.75, ransac_thresh=5.0, min_matches=10)
     kp1, desc1 = keypoints(img1)
     kp2, desc2 = keypoints(img2)
 
-    # Match keypoints with custom ratio threshold
+    # Match keypoints
     good_matches = match(desc1, desc2, kp1, kp2, ratio_thresh=ratio_thresh)
 
     if len(good_matches) < min_matches:
         raise ValueError(f"Not enough good matches found (minimum {min_matches} required, got {len(good_matches)})")
 
-    # Compute homography with custom RANSAC threshold
+    # Compute homography
     H, mask = compute_homography(kp1, kp2, good_matches)
 
-    # Decompose homography matrix into rotation, translation and scale
-    # Get image center for rotation reference
-    h, w = img1.shape[:2]
-    center = (w / 2, h / 2)
-    
-    # Decompose homography
-    _, Rs, Ts, Ns = cv2.decomposeHomographyMat(H, np.array([[0,0,1]]))
-    
-    # Select the most probable solution (usually the first one for simple transformations)
-    R = Rs[0]
-    T = Ts[0]
-    
-    # Extract rotation angle (in degrees)
-    rotation_angle = np.degrees(np.arctan2(R[1,0], R[0,0]))
-    
-    # Extract scale (average of x and y scaling)
-    scale = np.sqrt((H[0,0]**2 + H[1,0]**2 + H[0,1]**2 + H[1,1]**2) / 2)
-    
-    # Extract translation
-    dx = H[0,2]
-    dy = H[1,2]
-    
-    # Calculate confidence score based on inlier ratio
-    num_inliers = np.sum(mask)
-    confidence = num_inliers / len(good_matches) if len(good_matches) > 0 else 0
-
     return {
-        'translation': (dx, dy),
-        'rotation': rotation_angle,
-        'scale': scale,
-        'confidence': confidence,
         'homography': H,
         'inliers_mask': mask,
         'num_matches': len(good_matches)
@@ -201,8 +166,6 @@ def visualize_matches(img1, img2, title="Image Matching Visualization"):
 
     # Compute homography
     H, mask = compute_homography(kp1, kp2, good_matches)
-    print("\nHomography Matrix:")
-    print(H)
 
     # Create match visualization
     matches_img = cv2.drawMatches(
