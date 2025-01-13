@@ -25,7 +25,7 @@ def video_to_array(video_path):
         ret, frame = cap.read()
         if not ret:
             break
-        frames.append(frame)
+        frames.append(frame.astype(np.uint8))
 
     cap.release()
 
@@ -35,9 +35,53 @@ def video_to_array(video_path):
     return frames
 
 
+def create_synthetic_frame(
+    size: tuple = (100, 100),
+    color: bool = False,
+    num_shapes: int = 50,
+    shape_size_range: tuple = (2, 8),
+) -> np.ndarray:
+    """
+    Create a synthetic frame with randomly placed shapes, either in random colors or white.
+
+    Args:
+        size (tuple): Frame size (height, width)
+        color (bool): If True, shapes will be random colors. If False, shapes will be white
+        num_shapes (int): Number of shapes to draw
+        shape_size_range (tuple): Range of shape sizes (min_size, max_size)
+
+    Returns:
+        np.ndarray: Frame with randomly placed shapes
+                   Shape is (height, width, 3) for RGB image
+    """
+    frame = np.zeros((*size, 3), dtype=np.uint8)
+
+    min_size, max_size = shape_size_range
+    for _ in range(num_shapes):
+        x = np.random.randint(max_size, size[1] - max_size)
+        y = np.random.randint(max_size, size[0] - max_size)
+        square_size = np.random.randint(min_size, max_size)
+
+        # Generate color for the square
+        if color:
+            square_color = (
+                np.random.randint(0, 256),
+                np.random.randint(0, 256),
+                np.random.randint(0, 256),
+            )
+        else:
+            square_color = (255, 255, 255)  # White
+
+        frame[y - square_size : y + square_size, x - square_size : x + square_size] = (
+            square_color
+        )
+
+    return frame.astype(np.uint8)
+
+
 def artificial_movement(image, transformation_matrices, clip_frames=False):
     """
-    Apply a sequence of transformation matrices to an image and track corner points.
+    Apply a sequence of transformation matrices to an image.
 
     Args:
         image (numpy.ndarray): Input image of shape (height, width, channels)
@@ -47,15 +91,8 @@ def artificial_movement(image, transformation_matrices, clip_frames=False):
                           If False, returns full-size frames with original dimensions
 
     Returns:
-        tuple: (
-            list: If clip_frames=True: List of cropped frames, each potentially of different size
-                 If clip_frames=False: List of full-size frames (height, width, channels)
-            tuple: ((x1, y1), (x2, y2)) coordinates of upper-left and lower-right corners
-                  relative to the original frame
-        )
-
-    Raises:
-        ValueError: If image is empty or transformation matrices are invalid
+        list: If clip_frames=True: List of cropped frames, each potentially of different size
+              If clip_frames=False: List of full-size frames (height, width, channels)
     """
     if image is None or image.size == 0:
         raise ValueError("Error: Empty input image")
@@ -63,46 +100,24 @@ def artificial_movement(image, transformation_matrices, clip_frames=False):
     height, width = image.shape[:2]
     results = [image.copy()]
 
-    # Initialize corner points
-    points = np.array(
-        [[0, 0, 1], [width - 1, height - 1, 1]]  # Upper left  # Lower right
-    )
-
-    # Apply transformations to both images and points
-    current_transform = np.eye(3)
+    # Apply transformations to images
     for matrix in transformation_matrices:
         if matrix.shape != (3, 3):
             raise ValueError("Error: Invalid transformation matrix shape")
 
-        # Update cumulative transformation
-        current_transform = matrix @ current_transform
-
         # Transform image
-        transformed = cv2.warpAffine(results[-1], matrix[:2, :], (width, height))
+        transformed = cv2.warpAffine(
+            results[-1], matrix[:2, :].astype(np.float32), (width, height)
+        )
         results.append(transformed)
 
-    # Transform points using final cumulative transformation
-    final_points = (current_transform @ points.T).T
-    final_points = final_points[:, :2] / final_points[:, 2:]
-
     if clip_frames:
-        # Clip coordinates to image bounds
-        def clip_coords(point, height, width):
-            x = np.clip(point[0], 0, width - 1)
-            y = np.clip(point[1], 0, height - 1)
-            return (int(x), int(y))
+        # Calculate bounds from last frame
+        non_black = np.where(results[-1] != 0)
+        if len(non_black[0]) > 0:  # If there are non-black pixels
+            y1, y2 = non_black[0].min(), non_black[0].max()
+            x1, x2 = non_black[1].min(), non_black[1].max()
+            # Crop all frames to the valid region
+            return [frame[y1 : y2 + 1, x1 : x2 + 1].copy() for frame in results]
 
-        upper_left = clip_coords(final_points[0], height, width)
-        lower_right = clip_coords(final_points[1], height, width)
-
-        # Crop all frames to the valid region
-        x1, y1 = upper_left
-        x2, y2 = lower_right
-        cropped_results = [frame[y1 : y2 + 1, x1 : x2 + 1].copy() for frame in results]
-
-        return cropped_results, (upper_left, lower_right)
-
-    return results, (
-        tuple(final_points[0].astype(int)),
-        tuple(final_points[1].astype(int)),
-    )
+    return results
