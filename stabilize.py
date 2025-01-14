@@ -1,7 +1,9 @@
 import cv2
 import numpy as np
 from findShift import find_shift
-
+ALPHA = 0.8
+MAX_ROTATION = 0.5
+MAX_TRANSLATION = 0.05
 
 def mean_transformation(M1, M2, alpha):
     """

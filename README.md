@@ -29,4 +29,4 @@ Implement the "Stereo Mosaicing" algorithm to create a video of n different pano
 
 ### stabilize.py
 *  [X] `align_frames`: given two frames find the homography matrix between them and align the second frame to the.
-*  [ ] `stabilize`: Stabilize the rotation and y translation in video by align the y translation and rotation for every frame to the frevius frame.
+*  [X] `stabilize`: Stabilize the rotation and y translation in video by align the y translation and rotation for every frame to the frevius frame.
