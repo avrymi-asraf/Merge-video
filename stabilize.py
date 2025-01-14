@@ -5,6 +5,7 @@ ALPHA = 0.8
 MAX_ROTATION = 0.5
 MAX_TRANSLATION = 0.05
 
+
 def stabilize(
     frames,
     ratio_thresh=0.75,
@@ -64,7 +65,7 @@ def stabilize(
         kp2, desc2 = sift.detectAndCompute(gray2.astype("uint8"), None)
 
         # Handle insufficient keypoints
-        if (len(kp1) < min_matches or len(kp2) < min_matches):
+        if len(kp1) < min_matches or len(kp2) < min_matches:
             if skip_no_matches:
                 H = np.eye(2, 3)
                 transformations.append(H)
@@ -97,12 +98,16 @@ def stabilize(
                 raise ValueError(f"Not enough good matches found")
 
         # Extract matched keypoints
-        src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(-1, 1, 2)
-        dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(-1, 1, 2)
+        src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches]).reshape(
+            -1, 1, 2
+        )
+        dst_pts = np.float32([kp2[m.trainIdx].pt for m in good_matches]).reshape(
+            -1, 1, 2
+        )
 
         # Compute transformation
-        H = cv2.estimateAffinePartial2D(src_pts, dst_pts, cv2.RANSAC)[0][:2]
-
+        H = cv2.estimateAffinePartial2D(dst_pts, src_pts, cv2.RANSAC)[0][:2]
+        transformations.append(H.copy())
         # Apply stabilization constraints
         rotation_rad = np.arctan2(H[1, 0], H[0, 0])
         rotation_deg = np.degrees(rotation_rad)
@@ -115,9 +120,7 @@ def stabilize(
             )
             cos_theta = np.cos(clamped_rad)
             sin_theta = np.sin(clamped_rad)
-            H[0:2, 0:2] = np.array(
-                [[cos_theta, -sin_theta], [sin_theta, cos_theta]]
-            )
+            H[0:2, 0:2] = np.array([[cos_theta, -sin_theta], [sin_theta, cos_theta]])
 
         # Apply translation constraints
         if max_translation is not None:
@@ -140,10 +143,9 @@ def stabilize(
             H[1, 2] = 0
 
         # Store transformation and apply its inverse for stabilization
-        transformations.append(H)
-        H_inv = cv2.invertAffineTransform(H)[:2]
+        # H_inv = cv2.invertAffineTransform(H)[:2]
         aligned_frame = cv2.warpAffine(
-            frame2, H_inv, (frame2.shape[1], frame2.shape[0])
+            frame2, H, (frame2.shape[1], frame2.shape[0])
         )
         stabilized_frames.append(aligned_frame)
 
