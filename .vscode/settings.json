@@ -1,0 +1,19 @@
+{
+    "github.copilot.chat.codeGeneration.useInstructionFiles": false,
+    "github.copilot.nextEditSuggestions.enabled": true,
+    "github.copilot.chat.codesearch.enabled": true,
+    "github.copilot.chat.agent.thinkingTool": true,
+    "github.copilot.chat.codeGeneration.instructions": [
+        {
+            "file": ".copilot-instructions.md"
+        }
+    ],
+    "github.copilot.chat.commitMessageGeneration.instructions": [
+        
+        {
+            "text": "write in two or three words what you did in this commit"
+        }
+    ],
+    "github.copilot.chat.editor.temporalContext.enabled": true,
+    "github.copilot.chat.edits.temporalContext.enabled": true
+}

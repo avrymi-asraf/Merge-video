@@ -226,3 +226,6 @@ def visualize_matches(img1, img2, title="Image Matching Visualization"):
     plt.tight_layout()
 
     return fig, matches_img, warped_img
+
+
+

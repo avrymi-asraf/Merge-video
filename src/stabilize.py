@@ -15,6 +15,7 @@ def stabilize(
     max_rotation_degrees=MAX_ROTATION,
     max_translation=MAX_TRANSLATION,
     alpha=ALPHA,
+    ecc=True,
 ):
     """
     Stabilize the rotation and translation in a video by aligning each frame to the previous frame.
@@ -47,7 +48,7 @@ def stabilize(
     previous_deg = 0
     previous_translation = 0
     sift = cv2.SIFT_create()
-
+    criteria = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 500, 1e-4)
     for i in range(1, len(frames)):
         frame1 = stabilized_frames[-1]
         frame2 = frames[i]
@@ -106,8 +107,12 @@ def stabilize(
         )
 
         # Compute transformation
+
         H = cv2.estimateAffinePartial2D(dst_pts, src_pts, cv2.RANSAC)[0][:2]
-        transformations.append(H.copy())
+        if ecc:
+            H = cv2.findTransformECC(
+                gray1, gray2, H.astype(np.float32), cv2.MOTION_EUCLIDEAN, criteria
+            )[1]
         # Apply stabilization constraints
         rotation_rad = np.arctan2(H[1, 0], H[0, 0])
         rotation_deg = np.degrees(rotation_rad)
@@ -136,6 +141,7 @@ def stabilize(
                 H[1, 2] = previous_translation * alpha + H[1, 2] * (1 - alpha)
                 previous_translation = H[1, 2]
 
+        transformations.append(H.copy())
         # Cancel axis if specified
         if cancel_axis == "x":
             H[0, 2] = 0
@@ -144,9 +150,40 @@ def stabilize(
 
         # Store transformation and apply its inverse for stabilization
         # H_inv = cv2.invertAffineTransform(H)[:2]
-        aligned_frame = cv2.warpAffine(
-            frame2, H, (frame2.shape[1], frame2.shape[0])
-        )
+        aligned_frame = cv2.warpAffine(frame2, H, (frame2.shape[1], frame2.shape[0]))
         stabilized_frames.append(aligned_frame)
 
     return stabilized_frames, transformations
+
+if __name__ == "__main__":
+    from itertools import product
+    from tools import (
+        video_to_array,
+        array_to_video,
+    )
+    from datetime import datetime
+
+    all_videos = [
+        "data\\input\\boat.mp4",
+        "data\\input\\Garden.mp4",
+        "data\\input\\House.mp4",
+        "data\\input\\Lguazu.mp4",
+        "data\\input\\Kessaria.mp4",
+        "data\\input\\Shinkansen.mp4",
+    ]
+    real_video_path = "data\\input\\boat.mp4"
+    for vido_path in all_videos[:1]:
+        real_frames = video_to_array(real_video_path)
+        stabilized_real_frames = stabilize(
+            real_frames[:150], cancel_axis="x", skip_no_matches=True, ecc=True, alpha=0.8
+        )[0]
+
+        # Save real video before and after stabilization
+
+        current_time = datetime.now().strftime("%H%M")
+        array_to_video(
+            stabilized_real_frames,
+            f"data\\my_output\\stabilize_alpha_{0.8}_{current_time}.mp4",
+            fps=20,
+        )
+
