@@ -172,3 +172,5 @@ cython_debug/
 *.mp4
 *.pdf
 *.pptx
+data/my_output/
+example/

@@ -1,3 +1,5 @@
 numpy
 scipy
 plotly
+cv2
+matplotlib

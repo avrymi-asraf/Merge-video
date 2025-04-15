@@ -15,19 +15,13 @@ Implement the "Stereo Mosaicing" algorithm to create a video of n different pano
 ## Files and Functions
 
 ### tools.py
-*   [X] `video_to_array`: Convert a video into an array of frames.
-*   [X] `artificial_movement`: Apply artificial movement to a frame or an array of frames according to a given set of transformation matrices.
-*   [X] `random_image`: Create a synthetic frame with a given size, color, number of shapes, and shape size range.
-*   [X] `array_to_video` convert np.array of frames to vidoe.
+*  [X] `video_to_array`: Convert a video into an array of frames.
+*  [X] `artificial_movement`: Apply artificial movement to a frame or an array of frames according to a given set of transformation matrices.
+*  [X] `random_image`: Create a synthetic frame with a given size, color, number of shapes, and shape size range.
+*  [X] `array_to_video` convert np.array of frames to vidoe.
 
 ### findShift.py
-*   [X] `keypoints`: Detect keypoints in an image using sift algorithm.
-*   [X] `match`: matche for the points using RANSAC algorithem.
-*   [X] `compute_homography`: Compute the homography matrix between two images.
-*   [X] `find_shift`: Find the shift between two images.
-*   [X] `visualize_matches`: visualize matches between two images.
+*  [X] `calc_translations`: Given array of frames, find the rigid transformation between them using SIFT feature matching, return list of transformations between consecutive frames, and the list of cumulative transformations between the first frame and each of the other frames.
+*  [ ] `create_canvas`: Create a canvas to hold the mosaic of the video, by calculating the size of the mosaic based on the matrix multiplication of the transformation matrices that result from the `findShift_SIFT` function.
+*  [X] `visualize_matches`: Visualize matches between two images using either SIFT or Lucas-Kanade.
 
-### stabilize.py
-*  [X] `align_frames`: given two frames find the homography matrix between them and align the second frame to the.
-*  [X] `stabilize`: Stabilize the rotation and y translation in video by align the y translation and rotation for every frame to the frevius frame.
-*  [X] `create_canvas`: Create a canvas to hold the mosaic of the video.

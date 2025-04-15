@@ -1,17 +1,19 @@
 import cv2
 import numpy as np
+import datetime
+import os
 
 
 def video_to_array(video_path):
     """
-    Convert a video file to an array of frames.
+    Convert a video file to a numpy array of frames.
 
     Args:
         video_path (str): Path to the video file
 
     Returns:
-        list: List of numpy arrays, where each array is a frame
-              Each frame has shape (height, width, channels)
+        np.ndarray: Array of frames with shape (num_frames, height, width, channels)
+                   Each frame is uint8 type with values 0-255
 
     Raises:
         ValueError: If video file cannot be opened or is empty
@@ -25,14 +27,17 @@ def video_to_array(video_path):
         ret, frame = cap.read()
         if not ret:
             break
-        frames.append(frame.astype(np.uint8))
+        frames.append(frame)
 
     cap.release()
 
     if not frames:
         raise ValueError("Error: Video file is empty")
 
-    return frames
+    return np.array(frames, dtype=np.uint8)
+
+def array_to_image(image, output_path):
+    cv2.imwrite(output_path, image)
 
 
 def random_image(
@@ -137,30 +142,23 @@ def array_to_video(frames, output_path, fps=30, codec='mp4v'):
     Raises:
         ValueError: If frames list is empty or frames have inconsistent dimensions
     """
-    if not frames or len(frames) == 0:
-        raise ValueError("Error: Empty frames list")
 
-    # Get dimensions from first frame
     height, width = frames[0].shape[:2]
     
-    # Create video writer object
     fourcc = cv2.VideoWriter_fourcc(*codec)
     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
     
     if not out.isOpened():
-        raise ValueError("Error: Could not create video file")
+            raise ValueError("Error: Could not create video file")
 
     try:
-        # Write frames to video
+ 
         for frame in frames:
             if frame.shape[:2] != (height, width):
                 raise ValueError("Error: Inconsistent frame dimensions")
             out.write(frame.astype(np.uint8))
     finally:
-        # Release resources
         out.release()
-
-
 
 
 def generate_complex_movement_matrices(num_frames, movement_intensity=1.0, sudden_movement_prob=0.1, noise_level=0.02):
@@ -219,3 +217,154 @@ def generate_complex_movement_matrices(num_frames, movement_intensity=1.0, sudde
         transformation_matrices.append(transformation_matrix)
 
     return transformation_matrices
+
+
+def apply_homography(image, homography_matrix, output_size=None):
+    """
+    Transform an image using a homography matrix.
+
+    Args:
+        image (np.ndarray): Input image of shape (height, width, channels)
+                           or (height, width) for grayscale images
+        homography_matrix (np.ndarray): 3x3 homography transformation matrix
+                                      that maps points from the input image to the output image
+        output_size (tuple, optional): Size of the output image as (width, height).
+                                     If None, the input image size is used.
+
+    Returns:
+        np.ndarray: Transformed image with the same number of channels as the input image.
+                   If output_size is specified, the returned image will have that size.
+
+    Raises:
+        ValueError: If the input image is empty or the homography matrix is invalid
+    """
+    if image is None or image.size == 0:
+        raise ValueError("Error: Empty input image")
+    
+    if homography_matrix.shape != (3, 3):
+        raise ValueError("Error: Homography matrix must be 3x3")
+    
+    height, width = image.shape[:2]
+    
+    # Use the input image size if output_size is not specified
+    if output_size is None:
+        output_size = (width, height)
+    
+    # Apply the homography transformation
+    transformed_image = cv2.warpPerspective(
+        image, 
+        homography_matrix, 
+        output_size,
+        flags=cv2.INTER_LINEAR,
+        borderMode=cv2.BORDER_CONSTANT,
+        borderValue=0
+    )
+    
+    return transformed_image
+
+
+if __name__ == "__main__":
+    # Test the apply_homography function
+    import matplotlib.pyplot as plt
+    
+    # Create a test image with a simple pattern
+    test_image = np.zeros((300, 300, 3), dtype=np.uint8)
+    test_image[50:250, 50:250] = (255, 255, 255)  # White square
+    
+    # Add a pattern inside the square to better visualize the transformation
+    for i in range(70, 230, 20):
+        cv2.line(test_image, (i, 70), (i, 230), (0, 0, 255), 2)  # Vertical red lines
+        cv2.line(test_image, (70, i), (230, i), (0, 255, 0), 2)  # Horizontal green lines
+    
+    # Create a homography matrix for perspective transformation
+    # This example creates a perspective effect (like viewing a square from an angle)
+    src_points = np.array([[50, 50], [250, 50], [250, 250], [50, 250]], dtype=np.float32)
+    dst_points = np.array([[80, 70], [220, 50], [250, 210], [30, 220]], dtype=np.float32)
+    homography_matrix = cv2.getPerspectiveTransform(src_points, dst_points)
+    
+    # Apply the homography
+    transformed_image = apply_homography(test_image, homography_matrix)
+    
+    # Display the results
+    plt.figure(figsize=(12, 6))
+    
+    plt.subplot(1, 2, 1)
+    plt.title("Original Image")
+    plt.imshow(cv2.cvtColor(test_image, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+    
+    plt.subplot(1, 2, 2)
+    plt.title("Transformed Image (Homography)")
+    plt.imshow(cv2.cvtColor(transformed_image, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+    
+    plt.tight_layout()
+    plt.show()
+    
+    # Test with additional homography examples
+    
+    # 1. Rotation homography (45 degrees)
+    center = (test_image.shape[1] // 2, test_image.shape[0] // 2)
+    angle = 45
+    scale = 1
+    rotation_matrix = cv2.getRotationMatrix2D(center, angle, scale)
+    rotation_homography = np.eye(3)
+    rotation_homography[:2, :] = rotation_matrix
+    rotated_image = apply_homography(test_image, rotation_homography)
+    
+    # 2. Translation homography (move 50px right, 30px down)
+    translation_homography = np.eye(3)
+    translation_homography[0, 2] = 50  # x translation
+    translation_homography[1, 2] = 30  # y translation
+    translated_image = apply_homography(test_image, translation_homography)
+    
+    # Display additional results
+    plt.figure(figsize=(12, 6))
+    
+    plt.subplot(1, 2, 1)
+    plt.title("Rotated Image (45 degrees)")
+    plt.imshow(cv2.cvtColor(rotated_image, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+    
+    plt.subplot(1, 2, 2)
+    plt.title("Translated Image (50px right, 30px down)")
+    plt.imshow(cv2.cvtColor(translated_image, cv2.COLOR_BGR2RGB))
+    plt.axis('off')
+    
+    plt.tight_layout()
+    plt.show()
+    
+    print("Homography transformation tests completed successfully!")
+
+
+
+
+def get_timestamp_folder(folder_name):
+    """
+    Generate a timestamp-based folder name with 6 digits representing day of month, hour, and minutes.
+
+    Args:
+        folder_name (str): folder name to add
+    
+    Returns:
+        str: Path to the output folder with timestamp in format 'data/my_output/test_find_shift_DDHHMM'
+             where DD is day of month (01-31), HH is hour (00-23), MM is minutes (00-59)
+    """
+    now = datetime.datetime.now()
+    # Day of month (01-31)
+    day = now.day
+    # Hour (00-23) 
+    hour = now.hour
+    # Minutes (00-59)
+    minute = now.minute
+    
+    # Format as 6 digits (DDHHMM)
+    timestamp = f"{day:02d}{hour:02d}{minute:02d}"
+    
+    # Create the full path
+    output_folder = os.path.join("data", "my_output", f"{folder_name}_{timestamp}")
+    
+    # Create the directory if it doesn't exist
+    os.makedirs(output_folder, exist_ok=True)
+    
+    return output_folder
