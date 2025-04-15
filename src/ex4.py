@@ -29,7 +29,7 @@ def find_good_matches(descriptors_im1, descriptors_im2, k=2, threshold=0.75):
     ]
 
 
-def ransac(match_point_last, match_point_curr, matches):
+def ransac(src_points, dest_point, matches, top_of_inliners=0.5):
     """
     Apply RANSAC algorithm to filter out outlier matches between two images.
 
@@ -41,10 +41,12 @@ def ransac(match_point_last, match_point_curr, matches):
     Returns:
         list: Filtered list of cv2.DMatch objects containing only inlier matches.
     """
-    _, inliers_mask = cv2.estimateAffinePartial2D(
-        match_point_last, match_point_curr, method=cv2.RANSAC
+    H, inliers_mask = cv2.estimateAffinePartial2D(
+        src_points, dest_point, method=cv2.RANSAC
     )
     inlier_matches = [match for i, match in enumerate(matches) if inliers_mask[i] == 1]
+    inlier_matches.sort(key=lambda x: x.distance)
+    inlier_matches = inlier_matches[: int(len(inlier_matches) * top_of_inliners)]
 
     return inlier_matches
 
@@ -64,13 +66,12 @@ def compute_transformation_matrix(
     Returns:
         np.ndarray: A 3x3 transformation matrix representing translation between frames.
     """
-    matches.sort(key=lambda x: x.distance)
-    top_k_matches = matches[:top_k]
+
     source_points = np.float32(
-        [keypoints_last[m.queryIdx].pt for m in top_k_matches]
+        [keypoints_last[m.queryIdx].pt for m in matches]
     ).reshape(-1, 2)
     destination_points = np.float32(
-        [keypoints_current[m.trainIdx].pt for m in top_k_matches]
+        [keypoints_current[m.trainIdx].pt for m in matches]
     ).reshape(-1, 2)
     diff = source_points - destination_points
     dx, dy = np.median(diff[:, 0]), np.median(diff[:, 1])
@@ -98,20 +99,20 @@ def calc_all_translations(frames):
     for i in range(len(frames) - 1):
         last_frame = frames[i]
         current_frame = frames[i + 1]
-        point_last, descriptors_last = sift.detectAndCompute(last_frame, None)
-        point_curr, descriptors_current = sift.detectAndCompute(current_frame, None)
+        src_points, descriptors_last = sift.detectAndCompute(last_frame, None)
+        dest_points, descriptors_current = sift.detectAndCompute(current_frame, None)
         matches = find_good_matches(descriptors_last, descriptors_current)
-        match_point_last = np.array(
-            [point_last[m.queryIdx].pt for m in matches], dtype=np.float32
+        match_src_points = np.array(
+            [src_points[m.queryIdx].pt for m in matches], dtype=np.float32
         ).reshape(-1, 1, 2)
-        match_point_curr = np.array(
-            [point_curr[m.trainIdx].pt for m in matches], dtype=np.float32
+        match_dest_points = np.array(
+            [dest_points[m.trainIdx].pt for m in matches], dtype=np.float32
         ).reshape(-1, 1, 2)
 
-        god_matches = ransac(match_point_last, match_point_curr, matches)
+        god_matches = ransac(match_src_points, match_dest_points, matches)
         translations[i] = compute_transformation_matrix(
-            point_last,
-            point_curr,
+            src_points,
+            dest_points,
             god_matches,
         )
         cumulative_translations.append(cumulative_translations[-1] @ translations[i])
